@@ -18,9 +18,16 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 .status-dot.active { display: block; animation: blink 1.2s infinite; }
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-.main { flex: 1; display: flex; overflow: hidden; }
-.panel-left { width: 22%; min-width: 220px; display: flex; flex-direction: column; border-right: 1px solid #2a2a3a; }
-.panel-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+.main { flex: 1; display: flex; overflow: hidden; position: relative; }
+.panel-left {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 20;
+  width: min(360px, 92vw); display: flex; flex-direction: column;
+  border-right: 1px solid #2a2a3a; background: #111119;
+  box-shadow: 10px 0 30px rgba(0,0,0,0.45);
+  transform: translateX(-102%); transition: transform 0.18s ease;
+}
+.panel-left.open { transform: translateX(0); }
+.panel-right { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.75rem; }
 
 .camera-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; background: #0a0a0f; position: relative; }
 .camera-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 0.5rem; }
@@ -48,7 +55,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 
 .qr-container { display: flex; flex-direction: column; align-items: center; }
 .qr-wrapper { background: #fff; padding: 0.75rem; border-radius: 0.75rem; }
-#qrcode img, #qrcode canvas { display: block; width: min(78vmin, 640px); height: min(78vmin, 640px); }
+#qrcode img, #qrcode canvas { display: block; width: min(88vmin, 900px); height: min(88vmin, 900px); }
 .chunk-info { margin-top: 0.75rem; text-align: center; }
 .chunk-idx { font-size: 1.1rem; font-weight: 700; }
 .chunk-total { font-size: 0.8rem; color: #888; }
@@ -72,13 +79,14 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   <div class="top-bar">
     <a href="/" class="back">&larr; Back</a>
     <h1>Send Data</h1>
+    <button class="btn btn-secondary btn-small" id="togglePanelBtn">Controls</button>
     <div class="status">
       <span id="statusText">Ready</span>
       <span class="status-dot" id="ackDot"></span>
     </div>
   </div>
   <div class="main">
-    <div class="panel-left">
+    <div class="panel-left open" id="sidePanel">
       <div class="camera-box">
         <div class="label">ACK Scanner</div>
         <div class="video-wrapper">
@@ -137,6 +145,8 @@ const pipVideo = document.getElementById('pipVideo');
 const pipCanvas = document.getElementById('pipCanvas');
 const pipOverlay = document.getElementById('pipOverlay');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
+const togglePanelBtn = document.getElementById('togglePanelBtn');
+const sidePanel = document.getElementById('sidePanel');
 
 let qr = null;
 let chunks = [];
@@ -199,6 +209,10 @@ if ('BarcodeDetector' in window) {
   }
 }
 
+togglePanelBtn.addEventListener('click', () => {
+  sidePanel.classList.toggle('open');
+});
+
 // ---- Input handling ----
 fileLabel.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
@@ -252,7 +266,7 @@ async function prepareData(text, file) {
 function initQR() {
   qrcodeEl.innerHTML = '';
   qr = new QRCode(qrcodeEl, {
-    width: 640, height: 640,
+    width: 900, height: 900,
     colorDark: '#000000',
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M
@@ -495,6 +509,7 @@ generateBtn.addEventListener('click', async () => {
     lastAckTime = Date.now();
     showChunk(0);
     startResendTimer();
+    sidePanel.classList.remove('open');
 
     statusText.textContent = 'Ready — waiting for receiver ACK';
     if (!cameraStream) toggleCamBtn.click();

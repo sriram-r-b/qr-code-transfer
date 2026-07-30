@@ -42,14 +42,18 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 @keyframes scanSweep { 0%,100% { top: 8%; } 50% { top: 92%; } }
 
 .ack-qr-container {
-  position: absolute; bottom: 16px; right: 16px;
-  background: #fff; padding: 6px; border-radius: 8px;
+  position: absolute; inset: 0;
+  background: #fff; padding: min(5vmin, 36px); border-radius: 0;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-  z-index: 10;
+  z-index: 12; display: none; align-items: center; justify-content: center;
 }
-.ack-qr-container canvas, .ack-qr-container img { display: block; width: 220px; height: 220px; }
+.ack-qr-container canvas, .ack-qr-container img {
+  display: block;
+  width: min(86vmin, calc(100vh - 170px), 900px);
+  height: min(86vmin, calc(100vh - 170px), 900px);
+}
 .ack-label {
-  position: absolute; bottom: 4px; left: 4px; right: 4px;
+  position: absolute; bottom: 12px; left: 12px; right: 12px;
   text-align: center; background: rgba(99,102,241,0.92);
   color: #fff; font-size: 0.65rem; padding: 2px 0; border-radius: 3px;
   font-weight: 700; letter-spacing: 0.03em;
@@ -276,7 +280,7 @@ function updateACK() {
   if (!ackQrInstance) {
     ackQR.innerHTML = '';
     ackQrInstance = new QRCode(ackQR, {
-      width: 220, height: 220,
+      width: 900, height: 900,
       colorDark: '#000000', colorLight: '#ffffff',
       correctLevel: QRCode.CorrectLevel.M
     });
@@ -286,7 +290,7 @@ function updateACK() {
   });
   ackQrInstance.clear();
   ackQrInstance.makeCode(payload);
-  ackContainer.style.display = 'block';
+  ackContainer.style.display = 'flex';
   ackLabel.textContent = 'CHUNK ' + (contiguousIdx + 1);
 }
 
