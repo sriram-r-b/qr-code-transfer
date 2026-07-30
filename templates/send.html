@@ -117,6 +117,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
           <div id="qrcode"></div>
         </div>
         <div class="chunk-info">
+          <div class="chunk-idx" id="chunkIdx">-</div>
           <div class="chunk-total" id="chunkTotal">-</div>
         </div>
         <div class="hash-row" id="hashDisplay"></div>
@@ -137,6 +138,7 @@ const fileInput = document.getElementById('fileInput');
 const fileLabel = document.getElementById('fileLabel');
 const fileBadge = document.getElementById('fileBadge');
 const qrcodeEl = document.getElementById('qrcode');
+const chunkIdx = document.getElementById('chunkIdx');
 const chunkTotal = document.getElementById('chunkTotal');
 const hashDisplay = document.getElementById('hashDisplay');
 const chunkDots = document.getElementById('chunkDots');
@@ -291,6 +293,7 @@ function showChunk(index) {
   });
 
   displayedIndex = index;
+  chunkIdx.textContent = 'Chunk ' + (index + 1);
   chunkTotal.textContent = 'of ' + totalChunks;
   updateDots(index);
   statusText.textContent = 'Showing chunk ' + (index + 1);
