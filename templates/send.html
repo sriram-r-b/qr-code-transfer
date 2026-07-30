@@ -108,7 +108,12 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
           <label class="file-label" id="fileLabel">&#128206; File</label>
           <input type="file" id="fileInput">
           <span class="file-badge hidden" id="fileBadge"></span>
-          <button class="btn btn-secondary btn-small" id="clearBtn">Clear</button>
+        </div>
+        <div class="input-row" style="margin-top: 10px; align-items: center;">
+          <label style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-right: 8px;">Delay/chunk (ms):</label>
+          <input type="number" id="delayInput" value="400" min="50" max="2000" step="50" style="width: 80px; padding: 4px; border-radius: 4px; border: none; outline: none; text-align: center;" />
+        </div>
+        <button class="btn btn-secondary btn-small" id="clearBtn" style="margin-top:10px;">Clear</button>
         </div>
       </div>
     </div>
@@ -145,6 +150,7 @@ const hashDisplay = document.getElementById('hashDisplay');
 const chunkDots = document.getElementById('chunkDots');
 const statusText = document.getElementById('statusText');
 const ackDot = document.getElementById('ackDot');
+const delayInput = document.getElementById('delayInput');
 
 const pipVideo = document.getElementById('pipVideo');
 const pipCanvas = document.getElementById('pipCanvas');
@@ -172,6 +178,7 @@ let lastAckScanLog = 0;
 let lastNoAckLog = 0;
 let barcodeDetector = null;
 let barcodeDetecting = false;
+let transmissionTimer = null;
 
 function debugLog(level, message, details = null) {
   console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log']('[send]', message, details || '');
@@ -334,33 +341,8 @@ function processACK(data) {
 
   if (msg.i > lastAcked) {
     lastAcked = msg.i;
-    lastAckTime = Date.now();
-    pipOverlay.classList.add('has-ack');
-    setTimeout(() => pipOverlay.classList.remove('has-ack'), 200);
-
-    ackDot.classList.add('active');
-    statusText.textContent = 'ACK ' + (lastAcked + 1) + '/' + totalChunks;
-    clearResendTimer();
-
-    debugLog('info', 'ACK accepted', {
-      ackIndex: msg.i,
-      newLastAcked: lastAcked,
-      totalChunks,
-      displayedIndex,
-      nextChunk: lastAcked + 1
-    });
-
-    if (lastAcked >= totalChunks - 1) {
-      statusText.textContent = 'Complete!';
-      ackDot.classList.remove('active');
-      return;
-    }
-
-    const next = lastAcked + 1;
-    if (next !== displayedIndex) {
-      showChunk(next);
-      startResendTimer();
-    }
+    // statusText.textContent = `ACK ${msg.i}/${totalChunks - 1}`;
+    // We are no longer advancing based on ACK!
   } else {
     debugLog('info', 'duplicate or old ACK ignored', { received: msg.i, lastAcked });
   }
@@ -517,6 +499,7 @@ function scanLoop() {
 
 // ---- Generate ----
 generateBtn.addEventListener('click', async () => {
+  if (transmissionTimer) clearInterval(transmissionTimer);
   const text = dataInput.value.trim();
   if (!text && !selectedFile) { statusText.textContent = 'Enter text or select a file'; return; }
 
@@ -536,14 +519,29 @@ generateBtn.addEventListener('click', async () => {
 
     initQR();
     lastAckTime = Date.now();
-    showChunk(0);
-    startResendTimer();
+    clearResendTimer();
     sidePanel.classList.remove('open');
 
     statusText.textContent = 'Ready — waiting for receiver ACK';
     if (!cameraStream) toggleCamBtn.click();
+    
+    displayedIndex = 0;
+    showChunk(0);
+    
+    // Auto-advance chunks based on delay
+    const delayMs = parseInt(delayInput.value, 10) || 400;
+    transmissionTimer = setInterval(() => {
+      displayedIndex++;
+      if (displayedIndex >= totalChunks) {
+        clearInterval(transmissionTimer);
+        statusText.textContent = 'Transmission Complete!';
+        return;
+      }
+      showChunk(displayedIndex);
+    }, delayMs);
+    
   } catch (e) {
-    statusText.textContent = 'Error: ' + e.message;
+    debugLog('error', 'preparation failed', { error: e.message });
   }
 
   generateBtn.disabled = false;

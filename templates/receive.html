@@ -299,7 +299,7 @@ function updateACK() {
   });
   ackQrInstance.clear();
   ackQrInstance.makeCode(payload);
-  ackContainer.style.display = 'flex';
+  // ackContainer.style.display = 'flex'; // Disabled as per user request to use sleep delay
   ackLabel.textContent = 'ACK CHUNK ' + (contiguousIdx + 1);
   debugLog('info', 'ACK QR displayed', {
     chunkAcked: contiguousIdx + 1,
