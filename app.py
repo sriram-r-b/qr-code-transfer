@@ -1,8 +1,16 @@
 from datetime import datetime
-
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+
+# Force browser to not cache HTML templates
+@app.after_request
+def add_header(response):
+    if 'text/html' in response.headers.get('Content-Type', ''):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 @app.route('/')
 def index():
