@@ -425,11 +425,16 @@ function stopCamera() {
 let frameSkip = 0;
 function scanLoop() {
   if (!scanning) return;
-  const ctx = pipCanvas.getContext('2d', { willReadFrequently: true });
+  const ctx = pipCanvas.getContext('2d');
   if (pipVideo.readyState >= pipVideo.HAVE_ENOUGH_DATA) {
-    pipCanvas.width = pipVideo.videoWidth || 160;
-    pipCanvas.height = pipVideo.videoHeight || 120;
-    ctx.drawImage(pipVideo, 0, 0);
+    const MAX_DIM = 640;
+    let scale = 1;
+    if (pipVideo.videoWidth > MAX_DIM) {
+      scale = MAX_DIM / pipVideo.videoWidth;
+    }
+    pipCanvas.width = (pipVideo.videoWidth * scale) || 160;
+    pipCanvas.height = (pipVideo.videoHeight * scale) || 120;
+    ctx.drawImage(pipVideo, 0, 0, pipCanvas.width, pipCanvas.height);
     frameSkip = (frameSkip + 1) % 3;
     if (frameSkip === 0) {
       try {
@@ -523,7 +528,7 @@ generateBtn.addEventListener('click', async () => {
     if (!c.length) throw new Error('No data');
 
     chunks = c;
-    sessionHash = hash;
+    sessionHash = hash.slice(0, 8);
     totalChunks = c.length;
     lastAcked = -1;
     window.lastDecodedAck = null;

@@ -424,7 +424,7 @@ async function verifyData(bytes) {
     const hashBuf = await crypto.subtle.digest('SHA-256', bytes);
     const hashArr = Array.from(new Uint8Array(hashBuf));
     const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
-    const match = hashHex === sessionHash;
+    const match = hashHex.startsWith(sessionHash);
     verifyHash.textContent = (match ? 'Verified' : 'MISMATCH');
     verifyHash.className = 'verify-hash ' + (match ? 'match' : 'mismatch');
   } catch {
@@ -489,11 +489,16 @@ function stopCamera() {
 let skip = 0;
 function scanLoop() {
   if (!scanning) return;
-  const ctx = recvCanvas.getContext('2d', { willReadFrequently: true });
+  const ctx = recvCanvas.getContext('2d');
   if (recvVideo.readyState >= recvVideo.HAVE_ENOUGH_DATA) {
-    recvCanvas.width = recvVideo.videoWidth || 320;
-    recvCanvas.height = recvVideo.videoHeight || 240;
-    ctx.drawImage(recvVideo, 0, 0);
+    const MAX_DIM = 640;
+    let scale = 1;
+    if (recvVideo.videoWidth > MAX_DIM) {
+      scale = MAX_DIM / recvVideo.videoWidth;
+    }
+    recvCanvas.width = (recvVideo.videoWidth * scale) || 320;
+    recvCanvas.height = (recvVideo.videoHeight * scale) || 240;
+    ctx.drawImage(recvVideo, 0, 0, recvCanvas.width, recvCanvas.height);
     const now = Date.now();
     if (now - lastFrameLog > 2000) {
       lastFrameLog = now;
