@@ -150,6 +150,41 @@ let animId = null;
 let selectedFile = null;
 let lastAckTime = 0;
 let resendTimer = null;
+let ackScanAttempts = 0;
+let ackDecodeHits = 0;
+let ackScanErrors = 0;
+let lastAckScanLog = 0;
+
+function debugLog(level, message, details = null) {
+  console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log']('[send]', message, details || '');
+  fetch('/client-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ page: 'send', level, message, details })
+  }).catch(() => {});
+}
+
+window.addEventListener('error', event => {
+  debugLog('error', 'window error', {
+    message: event.message,
+    source: event.filename,
+    line: event.lineno,
+    column: event.colno
+  });
+});
+
+window.addEventListener('unhandledrejection', event => {
+  debugLog('error', 'unhandled promise rejection', {
+    reason: String(event.reason && event.reason.message ? event.reason.message : event.reason)
+  });
+});
+
+debugLog('info', 'sender page loaded', {
+  jsQR: typeof jsQR,
+  QRCode: typeof QRCode,
+  userAgent: navigator.userAgent,
+  secureContext: window.isSecureContext
+});
 
 // ---- Input handling ----
 fileLabel.addEventListener('click', () => fileInput.click());
@@ -191,6 +226,12 @@ async function prepareData(text, file) {
     const b64 = btoa(String.fromCharCode(...slice));
     chunks.push({ i: chunks.length, d: b64 });
   }
+  debugLog('info', 'prepared data', {
+    totalBytes: bytes.length,
+    chunks: chunks.length,
+    chunkSize: CHUNK_SIZE,
+    hash: hash.slice(0, 16)
+  });
   return { chunks, hash, totalSize: bytes.length };
 }
 
@@ -213,6 +254,12 @@ function showChunk(index) {
   });
   qr.clear();
   qr.makeCode(payload);
+  debugLog('info', 'showing data chunk QR', {
+    chunk: index + 1,
+    totalChunks,
+    payloadLength: payload.length,
+    base64Length: c.d.length
+  });
 
   displayedIndex = index;
   chunkIdx.textContent = 'Chunk ' + (index + 1);
@@ -235,9 +282,21 @@ function updateDots(active) {
 // ---- ACK processing ----
 function processACK(data) {
   let msg;
-  try { msg = JSON.parse(data); } catch { return; }
-  if (msg.v !== 1 || msg.t !== 'a' || msg.h !== sessionHash) return;
-  if (msg.i === undefined) return;
+  debugLog('info', 'decoded ACK QR payload', { length: data.length, preview: data.slice(0, 160) });
+  try { msg = JSON.parse(data); } catch (e) {
+    debugLog('warn', 'decoded ACK QR is not JSON', { error: e.message, preview: data.slice(0, 160) });
+    return;
+  }
+  if (msg.v !== 1 || msg.t !== 'a' || msg.h !== sessionHash) {
+    debugLog('warn', 'decoded QR is not matching ACK', {
+      v: msg.v, t: msg.t, hashMatches: msg.h === sessionHash
+    });
+    return;
+  }
+  if (msg.i === undefined) {
+    debugLog('warn', 'ACK missing index', Object.keys(msg));
+    return;
+  }
 
   if (msg.i > lastAcked) {
     lastAcked = msg.i;
@@ -293,11 +352,20 @@ toggleCamBtn.addEventListener('click', async () => {
     });
     pipVideo.srcObject = cameraStream;
     await pipVideo.play();
+    const track = cameraStream.getVideoTracks()[0];
+    debugLog('info', 'ACK camera started', {
+      videoWidth: pipVideo.videoWidth,
+      videoHeight: pipVideo.videoHeight,
+      readyState: pipVideo.readyState,
+      settings: track && track.getSettings ? track.getSettings() : null,
+      constraints: track && track.getConstraints ? track.getConstraints() : null
+    });
     scanning = true;
     toggleCamBtn.textContent = 'Stop Camera';
     statusText.textContent = 'Camera active';
     scanLoop();
   } catch (e) {
+    debugLog('error', 'ACK camera error', { name: e.name, message: e.message });
     statusText.textContent = 'Camera error: ' + e.message;
   }
 });
@@ -321,12 +389,32 @@ function scanLoop() {
     frameSkip = (frameSkip + 1) % 3;
     if (frameSkip === 0) {
       try {
+        ackScanAttempts++;
         const imageData = ctx.getImageData(0, 0, pipCanvas.width, pipCanvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-        if (code && code.data) processACK(code.data);
+        if (code && code.data) {
+          ackDecodeHits++;
+          debugLog('info', 'jsQR decoded ACK candidate', {
+            length: code.data.length,
+            location: code.location || null
+          });
+          processACK(code.data);
+        }
       } catch (e) {
+        ackScanErrors++;
+        debugLog('error', 'ACK scan exception', { name: e.name, message: e.message });
         statusText.textContent = 'Scan error: ' + e.message;
       }
+    }
+    if (Date.now() - lastAckScanLog > 5000) {
+      lastAckScanLog = Date.now();
+      debugLog('info', 'ACK scan stats', {
+        attempts: ackScanAttempts,
+        errors: ackScanErrors,
+        hits: ackDecodeHits,
+        videoWidth: pipVideo.videoWidth,
+        videoHeight: pipVideo.videoHeight
+      });
     }
   }
   animId = requestAnimationFrame(scanLoop);
