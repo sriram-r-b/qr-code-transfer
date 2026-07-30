@@ -437,27 +437,33 @@ function scanLoop() {
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
         if (code && code.data) {
           ackDecodeHits++;
-          debugLog('info', 'jsQR decoded ACK candidate', {
-            length: code.data.length,
-            location: code.location || null
-          });
-          processACK(code.data);
+          if (code.data !== window.lastDecodedAck) {
+            window.lastDecodedAck = code.data;
+            debugLog('info', 'jsQR decoded ACK candidate', {
+              length: code.data.length,
+              location: code.location || null
+            });
+            processACK(code.data);
+          }
         } else if (barcodeDetector && !barcodeDetecting) {
           barcodeDetecting = true;
           barcodeDetector.detect(pipCanvas).then(codes => {
             if (codes.length && codes[0].rawValue) {
               ackDecodeHits++;
-              debugLog('info', 'native BarcodeDetector decoded ACK candidate', {
-                length: codes[0].rawValue.length,
-                format: codes[0].format,
-                boundingBox: codes[0].boundingBox ? {
-                  x: Math.round(codes[0].boundingBox.x),
-                  y: Math.round(codes[0].boundingBox.y),
-                  width: Math.round(codes[0].boundingBox.width),
-                  height: Math.round(codes[0].boundingBox.height)
-                } : null
-              });
-              processACK(codes[0].rawValue);
+              if (codes[0].rawValue !== window.lastDecodedAck) {
+                window.lastDecodedAck = codes[0].rawValue;
+                debugLog('info', 'native BarcodeDetector decoded ACK candidate', {
+                  length: codes[0].rawValue.length,
+                  format: codes[0].format,
+                  boundingBox: codes[0].boundingBox ? {
+                    x: Math.round(codes[0].boundingBox.x),
+                    y: Math.round(codes[0].boundingBox.y),
+                    width: Math.round(codes[0].boundingBox.width),
+                    height: Math.round(codes[0].boundingBox.height)
+                  } : null
+                });
+                processACK(codes[0].rawValue);
+              }
             } else if (Date.now() - lastNoAckLog > 5000) {
               lastNoAckLog = Date.now();
               debugLog('info', 'no ACK QR found in recent frames', {

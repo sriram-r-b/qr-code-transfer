@@ -277,7 +277,14 @@ function computeContiguous() {
   return i - 1;
 }
 
+let lastDrawnAck = -1;
 function updateACK() {
+  if (contiguousIdx === lastDrawnAck) {
+    ackContainer.style.display = 'flex';
+    return;
+  }
+  lastDrawnAck = contiguousIdx;
+
   if (!ackQrInstance) {
     ackQR.innerHTML = '';
     ackQrInstance = new QRCode(ackQR, {
@@ -507,27 +514,33 @@ function scanLoop() {
         });
         if (code && code.data) {
           decodeHits++;
-          debugLog('info', 'jsQR decoded candidate', {
-            length: code.data.length,
-            location: code.location || null
-          });
-          processData(code.data);
+          if (code.data !== window.lastDecodedQR) {
+            window.lastDecodedQR = code.data;
+            debugLog('info', 'jsQR decoded candidate', {
+              length: code.data.length,
+              location: code.location || null
+            });
+            processData(code.data);
+          }
         } else if (barcodeDetector && !barcodeDetecting) {
           barcodeDetecting = true;
           barcodeDetector.detect(recvCanvas).then(codes => {
             if (codes.length && codes[0].rawValue) {
               decodeHits++;
-              debugLog('info', 'native BarcodeDetector decoded candidate', {
-                length: codes[0].rawValue.length,
-                format: codes[0].format,
-                boundingBox: codes[0].boundingBox ? {
-                  x: Math.round(codes[0].boundingBox.x),
-                  y: Math.round(codes[0].boundingBox.y),
-                  width: Math.round(codes[0].boundingBox.width),
-                  height: Math.round(codes[0].boundingBox.height)
-                } : null
-              });
-              processData(codes[0].rawValue);
+              if (codes[0].rawValue !== window.lastDecodedQR) {
+                window.lastDecodedQR = codes[0].rawValue;
+                debugLog('info', 'native BarcodeDetector decoded candidate', {
+                  length: codes[0].rawValue.length,
+                  format: codes[0].format,
+                  boundingBox: codes[0].boundingBox ? {
+                    x: Math.round(codes[0].boundingBox.x),
+                    y: Math.round(codes[0].boundingBox.y),
+                    width: Math.round(codes[0].boundingBox.width),
+                    height: Math.round(codes[0].boundingBox.height)
+                  } : null
+                });
+                processData(codes[0].rawValue);
+              }
             } else if (Date.now() - lastNoCodeLog > 2000) {
               lastNoCodeLog = Date.now();
               debugLog('info', 'no QR found in recent frames', {
