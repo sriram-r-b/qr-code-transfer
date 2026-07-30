@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receive Data - QR Data Transfer</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f13; color: #e0e0e0; min-height: 100vh;
+}
+.container { max-width: 860px; margin: 0 auto; padding: 1.5rem; }
+.top-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+.back {
+  background: #1a1a24; border: 1px solid #2a2a3a; color: #e0e0e0;
+  padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
+  text-decoration: none; font-size: 0.9rem; transition: background 0.2s;
+}
+.back:hover { background: #2a2a34; }
+h1 { font-size: 1.5rem; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.card { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+.card-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+
+.btn {
+  padding: 0.6rem 1.4rem; border-radius: 0.5rem; border: none; cursor: pointer;
+  font-size: 0.95rem; font-weight: 600; transition: all 0.2s;
+}
+.btn-primary { background: #6366f1; color: #fff; }
+.btn-primary:hover { background: #5558e6; transform: translateY(-1px); }
+.btn-primary:disabled { background: #3a3a5a; cursor: not-allowed; transform: none; }
+.btn-secondary { background: #2a2a3a; color: #e0e0e0; }
+.btn-secondary:hover { background: #3a3a4a; }
+.btn-success { background: #22c55e; color: #fff; }
+.btn-success:hover { background: #16a34a; }
+.btn-success:disabled { background: #166534; cursor: not-allowed; }
+
+.camera-section { text-align: center; }
+.video-wrapper {
+  position: relative; display: inline-block; border-radius: 0.75rem; overflow: hidden;
+  background: #000; max-width: 100%;
+}
+#video { width: 100%; max-width: 520px; display: block; transform: scaleX(-1); }
+#canvas { display: none; }
+.scan-overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 0.75rem; pointer-events: none;
+  border: 3px solid rgba(99,102,241,0.35); transition: border-color 0.12s;
+}
+.scan-overlay.detected { border-color: rgba(34,197,94,0.7); }
+.scan-corner {
+  position: absolute; width: 28px; height: 28px;
+  border-color: #6366f1; border-style: solid;
+}
+.scan-corner.tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; }
+.scan-corner.tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; }
+.scan-corner.bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; }
+.scan-corner.br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; }
+.scan-line {
+  position: absolute; left: 5%; width: 90%; height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, transparent);
+  animation: scanMove 2s ease-in-out infinite;
+}
+@keyframes scanMove { 0%, 100% { top: 10%; } 50% { top: 90%; } }
+
+.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+
+.chunks-grid {
+  display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin: 0.75rem 0;
+}
+.chunk-dot {
+  width: 28px; height: 28px; border-radius: 6px; background: #2a2a3a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 600; transition: all 0.25s;
+  border: 2px solid transparent;
+}
+.chunk-dot.pending { background: #2a2a3a; color: #555; }
+.chunk-dot.received { background: #22c55e; color: #fff; }
+.chunk-dot.missing { background: #ef4444; color: #fff; animation: pulse 1s infinite; }
+.chunk-dot.just-scanned { background: #6366f1; color: #fff; transform: scale(1.15); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.progress-row {
+  display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0;
+}
+.progress-bar { flex: 1; height: 8px; background: #2a2a3a; border-radius: 4px; overflow: hidden; }
+.progress-fill {
+  height: 100%; background: linear-gradient(90deg, #6366f1, #22c55e);
+  border-radius: 4px; transition: width 0.3s ease; width: 0%;
+}
+.progress-text { font-size: 0.9rem; color: #888; min-width: 6rem; text-align: center; }
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.9rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+}
+.status-chip.scanning { background: rgba(99,102,241,0.15); color: #818cf8; }
+.status-chip.receiving { background: rgba(34,197,94,0.15); color: #22c55e; }
+.status-chip.retry { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.status-chip.done { background: rgba(34,197,94,0.2); color: #22c55e; }
+
+.log-section { max-height: 110px; overflow-y: auto; font-family: monospace; font-size: 0.78rem; margin-top: 0.75rem; }
+.log-entry { padding: 2px 0; color: #888; }
+.log-entry.info { color: #818cf8; }
+.log-entry.success { color: #22c55e; }
+.log-entry.error { color: #ef4444; }
+.log-entry.warn { color: #f59e0b; }
+
+.output-area {
+  width: 100%; min-height: 120px; background: #12121c; border: 1px solid #2a2a3a;
+  border-radius: 0.5rem; padding: 0.75rem; color: #e0e0e0; font-size: 0.9rem;
+  font-family: inherit; outline: none; resize: vertical;
+}
+.hash-display { font-family: monospace; font-size: 0.75rem; color: #666; word-break: break-all; margin-top: 0.5rem; }
+.hash-display.match { color: #22c55e; }
+.hash-display.mismatch { color: #ef4444; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <a href="/" class="back">&larr; Back</a>
+    <h1>Receive Data</h1>
+    <span class="status-chip scanning hidden" id="recvStatus">SCANNING</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Camera Scanner</div>
+    <div class="camera-section">
+      <div class="video-wrapper">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="scan-overlay" id="scanOverlay">
+          <span class="scan-corner tl"></span>
+          <span class="scan-corner tr"></span>
+          <span class="scan-corner bl"></span>
+          <span class="scan-corner br"></span>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="startBtn">&#9654; Start Camera</button>
+        <button class="btn btn-secondary hidden" id="stopBtn">&#9646;&#9646; Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="progressCard">
+    <div class="card-title">Progress</div>
+    <div class="progress-row">
+      <span class="progress-text" id="chunkStatus">Waiting for first QR code...</span>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+    <div id="chunksGrid" class="chunks-grid"></div>
+    <div id="logSection" class="log-section"></div>
+  </div>
+
+  <div class="card hidden" id="outputCard">
+    <div class="card-title">Received Data</div>
+    <div id="fileInfoDisplay" class="hidden" style="margin-bottom:0.75rem;padding:0.5rem;background:#12121c;border-radius:0.5rem;">
+      <strong>File:</strong> <span id="receivedFileName"></span>
+    </div>
+    <textarea class="output-area" id="outputText" readonly placeholder="Decoded data..."></textarea>
+    <div class="hash-display" id="verifyHash"></div>
+    <div class="btn-row">
+      <button class="btn btn-success" id="copyBtn">&#128203; Copy</button>
+      <button class="btn btn-success hidden" id="downloadBtn">&#128190; Download</button>
+      <button class="btn btn-secondary" id="resetBtn">&#8635; Scan Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const scanOverlay = document.getElementById('scanOverlay');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const progressFill = document.getElementById('progressFill');
+const chunkStatus = document.getElementById('chunkStatus');
+const chunksGrid = document.getElementById('chunksGrid');
+const logSection = document.getElementById('logSection');
+const outputCard = document.getElementById('outputCard');
+const outputText = document.getElementById('outputText');
+const fileInfoDisplay = document.getElementById('fileInfoDisplay');
+const receivedFileName = document.getElementById('receivedFileName');
+const verifyHash = document.getElementById('verifyHash');
+const copyBtn = document.getElementById('copyBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
+const recvStatus = document.getElementById('recvStatus');
+
+let stream = null;
+let scanning = false;
+let animFrameId = null;
+let gapCheckInterval = null;
+
+let receivedChunks = {};
+let totalChunks = null;
+let expectedHash = null;
+let sessionId = null;
+let dataFilename = '';
+let dataIsFile = false;
+let lastAckTime = {};
+
+// --- Helpers ---
+function addLog(msg, type = 'info') {
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  const t = new Date().toLocaleTimeString();
+  entry.textContent = '[' + t + '] ' + msg;
+  logSection.appendChild(entry);
+  logSection.scrollTop = logSection.scrollHeight;
+}
+
+function setStatus(text, cls = 'scanning') {
+  recvStatus.textContent = text;
+  recvStatus.className = 'status-chip ' + cls;
+  recvStatus.classList.remove('hidden');
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.value = 0.15;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch {}
+}
+
+// --- Camera ---
+startBtn.addEventListener('click', startCamera);
+stopBtn.addEventListener('click', stopCamera);
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    startBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+    scanning = true;
+    setStatus('Scanning', 'scanning');
+    addLog('Camera started — point at QR codes', 'info');
+    scanLoop();
+    startGapCheck();
+  } catch (err) {
+    addLog('Camera error: ' + err.message, 'error');
+    alert('Camera access denied or unavailable.\nGrant camera permission and try again.');
+  }
+}
+
+function stopCamera() {
+  scanning = false;
+  stopGapCheck();
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  video.srcObject = null;
+  stopBtn.classList.add('hidden');
+  startBtn.classList.remove('hidden');
+  addLog('Camera stopped', 'warn');
+}
+
+// --- Scanning loop ---
+function scanLoop() {
+  if (!scanning) return;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    try {
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (code && code.data) processQR(code.data);
+    } catch {}
+  }
+  animFrameId = requestAnimationFrame(scanLoop);
+}
+
+// --- QR processing ---
+function processQR(raw) {
+  let msg;
+  try { msg = JSON.parse(raw); } catch { return; }
+  if (msg.v !== 1) return;
+
+  const sid = msg.s;
+  const idx = msg.i;
+  const total = msg.t;
+  const hash = msg.h;
+  const dataB64 = msg.d;
+
+  if (!sid || idx === undefined || !total || !hash || !dataB64) return;
+
+  if (sessionId && sessionId !== sid) {
+    addLog('New session detected: ' + sid, 'info');
+  }
+
+  sessionId = sid;
+  if (totalChunks === null) {
+    totalChunks = total;
+    expectedHash = hash;
+    renderGrid();
+    setStatus('Receiving', 'receiving');
+    addLog('Transfer started: ' + total + ' chunks from session ' + sid.slice(0, 16), 'success');
+  }
+
+  if (total !== totalChunks) {
+    addLog('Chunk count mismatch: expected ' + totalChunks + ', got ' + total, 'warn');
+    return;
+  }
+
+  if (receivedChunks[idx] !== undefined) {
+    flashOverlay('detected');
+    return;
+  }
+
+  receivedChunks[idx] = dataB64;
+  flashOverlay('detected');
+  beep();
+
+  updateChunkDot(idx, 'received');
+  updateProgress();
+
+  const count = Object.keys(receivedChunks).length;
+  addLog('Chunk ' + (idx + 1) + '/' + total + ' received (' + Math.round(count / total * 100) + '%)', 'success');
+
+  // Send ACK to server
+  sendAck(sid, idx);
+
+  if (count === totalChunks) {
+    stopCamera();
+    stopGapCheck();
+    reassemble();
+  }
+}
+
+function flashOverlay(cls) {
+  scanOverlay.classList.add(cls);
+  clearTimeout(scanOverlay._flashTimer);
+  scanOverlay._flashTimer = setTimeout(() => scanOverlay.classList.remove(cls), 200);
+}
+
+// --- ACK sender ---
+function sendAck(sid, idx) {
+  lastAckTime[idx] = Date.now();
+  fetch('/api/session/' + sid + '/ack', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chunk_index: idx }),
+  }).catch(() => {});
+}
+
+// --- Gap detection & retry ---
+function startGapCheck() {
+  gapCheckInterval = setInterval(checkGaps, 2500);
+}
+
+function stopGapCheck() {
+  if (gapCheckInterval) { clearInterval(gapCheckInterval); gapCheckInterval = null; }
+}
+
+function checkGaps() {
+  if (!sessionId || totalChunks === null) return;
+  const count = Object.keys(receivedChunks).length;
+  if (count === 0 || count >= totalChunks) return;
+
+  const missing = [];
+  for (let i = 0; i < totalChunks; i++) {
+    if (receivedChunks[i] === undefined) missing.push(i);
+  }
+
+  if (missing.length > 0) {
+    const missingStr = missing.map(i => (i + 1)).join(', ');
+    addLog('Missing chunk(s): ' + missingStr + ' — requesting retry', 'warn');
+    setStatus('Retrying ' + missing.length + ' chunk(s)', 'retry');
+    missing.forEach(i => updateChunkDot(i, 'missing'));
+
+    fetch('/api/session/' + sessionId + '/retry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ indices: missing }),
+    }).catch(() => {});
+  } else {
+    setStatus('Receiving', 'receiving');
+  }
+}
+
+// --- Grid ---
+function renderGrid() {
+  chunksGrid.innerHTML = '';
+  for (let i = 0; i < totalChunks; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'chunk-dot pending';
+    dot.id = 'rd-' + i;
+    dot.textContent = i + 1;
+    chunksGrid.appendChild(dot);
+  }
+}
+
+function updateChunkDot(idx, state) {
+  const dot = document.getElementById('rd-' + idx);
+  if (!dot) return;
+  dot.className = 'chunk-dot ' + state;
+}
+
+function updateProgress() {
+  const count = Object.keys(receivedChunks).length;
+  const pct = (count / totalChunks) * 100;
+  progressFill.style.width = pct + '%';
+  chunkStatus.textContent = count + ' / ' + totalChunks + ' chunks';
+}
+
+// --- Reassembly ---
+function reassemble() {
+  addLog('All chunks received — reassembling...', 'success');
+  setStatus('Complete!', 'done');
+  progressFill.style.width = '100%';
+  chunkStatus.textContent = totalChunks + ' / ' + totalChunks + ' chunks';
+
+  const sorted = [];
+  for (let i = 0; i < totalChunks; i++) {
+    if (receivedChunks[i] === undefined) {
+      addLog('Missing chunk ' + (i + 1) + ' — reassembly failed', 'error');
+      return;
+    }
+    sorted.push(receivedChunks[i]);
+  }
+
+  try {
+    const raw = atob(sorted.join(''));
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+    let textOutput;
+    let isBinary = false;
+    try {
+      textOutput = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      isBinary = true;
+      textOutput = '[Binary data: ' + formatSize(bytes.length) + ']';
+    }
+
+    outputText.value = textOutput;
+    outputCard.classList.remove('hidden');
+
+    if (dataFilename || dataIsFile) {
+      fileInfoDisplay.classList.remove('hidden');
+      receivedFileName.textContent = dataFilename || 'unnamed file';
+      downloadBtn.classList.remove('hidden');
+    } else {
+      downloadBtn.classList.add('hidden');
+    }
+
+    addLog('Reassembled ' + formatSize(bytes.length), 'success');
+    verifyData(bytes);
+  } catch (e) {
+    addLog('Reassembly error: ' + e.message, 'error');
+  }
+}
+
+async function verifyData(bytes) {
+  try {
+    const hashBuf = await crypto.subtle.digest('MD5', bytes);
+    const hashArr = Array.from(new Uint8Array(hashBuf));
+    const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+    const match = hashHex === expectedHash;
+    verifyHash.textContent = 'MD5: ' + hashHex + (match ? ' Verified' : ' MISMATCH');
+    verifyHash.className = 'hash-display ' + (match ? 'match' : 'mismatch');
+    addLog('Integrity check: ' + (match ? 'PASSED' : 'FAILED'), match ? 'success' : 'error');
+  } catch {
+    try {
+      const b64 = btoa(String.fromCharCode(...bytes));
+      const resp = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: b64, hash: expectedHash }),
+      });
+      const r = await resp.json();
+      verifyHash.textContent = 'MD5: ' + r.actual + (r.match ? ' Verified' : ' MISMATCH');
+      verifyHash.className = 'hash-display ' + (r.match ? 'match' : 'mismatch');
+      addLog('Integrity check: ' + (r.match ? 'PASSED' : 'FAILED'), r.match ? 'success' : 'error');
+    } catch {
+      verifyHash.textContent = 'MD5: ' + expectedHash + ' (verification unavailable)';
+    }
+  }
+}
+
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(outputText.value).then(() => {
+    addLog('Copied to clipboard', 'info');
+  }).catch(() => {
+    outputText.select();
+    document.execCommand('copy');
+  });
+});
+
+downloadBtn.addEventListener('click', () => {
+  const blob = new Blob([outputText.value], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = dataFilename || 'received-data.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog('File downloaded', 'info');
+});
+
+resetBtn.addEventListener('click', () => {
+  receivedChunks = {};
+  totalChunks = null;
+  expectedHash = null;
+  sessionId = null;
+  dataFilename = '';
+  dataIsFile = false;
+  lastAckTime = {};
+  progressFill.style.width = '0%';
+  chunkStatus.textContent = 'Waiting for first QR code...';
+  chunksGrid.innerHTML = '';
+  outputCard.classList.add('hidden');
+  fileInfoDisplay.classList.add('hidden');
+  verifyHash.textContent = '';
+  verifyHash.className = 'hash-display';
+  logSection.innerHTML = '';
+  recvStatus.classList.add('hidden');
+  stopCamera();
+});
+</script>
+</body>
+</html>

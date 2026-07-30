@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Data Transfer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f13;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.container { max-width: 900px; width: 100%; padding: 2rem; }
+h1 {
+  text-align: center; font-size: 2.8rem; font-weight: 700;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+.subtitle { text-align: center; color: #888; margin-bottom: 3rem; font-size: 1.1rem; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.card {
+  background: #1a1a24; border-radius: 1.25rem; padding: 2.5rem 2rem;
+  text-align: center; cursor: pointer; transition: all 0.3s ease;
+  border: 1px solid #2a2a3a; text-decoration: none; color: inherit;
+  display: block;
+}
+.card:hover { transform: translateY(-4px); border-color: #6366f1; box-shadow: 0 8px 32px rgba(99,102,241,0.15); }
+.card-icon { font-size: 3rem; margin-bottom: 1rem; }
+.card h2 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.card p { color: #888; line-height: 1.5; }
+.card .badge {
+  display: inline-block; margin-top: 1rem; padding: 0.35rem 0.9rem;
+  border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+}
+.card .badge.send { background: rgba(99,102,241,0.15); color: #818cf8; }
+.card .badge.receive { background: rgba(168,85,247,0.15); color: #c084fc; }
+@media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>&#9670; QR Data Transfer</h1>
+  <p class="subtitle">Transfer data between devices using QR codes</p>
+  <div class="cards">
+    <a href="/send" class="card">
+      <div class="card-icon">&#8593;</div>
+      <h2>Send Data</h2>
+      <p>Convert text or files into a sequence of QR codes. Point the receiver's camera at your screen.</p>
+      <span class="badge send">Generate QR Codes</span>
+    </a>
+    <a href="/receive" class="card">
+      <div class="card-icon">&#8595;</div>
+      <h2>Receive Data</h2>
+      <p>Use your camera to scan a sequence of QR codes and reconstruct the original data.</p>
+      <span class="badge receive">Scan QR Codes</span>
+    </a>
+  </div>
+</div>
+</body>
+</html>
