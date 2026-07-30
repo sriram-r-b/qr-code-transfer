@@ -47,12 +47,12 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   z-index: 10;
 }
-.ack-qr-container canvas, .ack-qr-container img { display: block; width: 120px; height: 120px; }
+.ack-qr-container canvas, .ack-qr-container img { display: block; width: 180px; height: 180px; }
 .ack-label {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  text-align: center; background: rgba(99,102,241,0.9);
-  color: #fff; font-size: 0.6rem; padding: 2px 0;
-  font-weight: 600; letter-spacing: 0.05em;
+  position: absolute; bottom: 4px; left: 4px; right: 4px;
+  text-align: center; background: rgba(99,102,241,0.92);
+  color: #fff; font-size: 0.65rem; padding: 2px 0; border-radius: 3px;
+  font-weight: 700; letter-spacing: 0.03em;
 }
 
 .bottom-bar { padding: 0.6rem 1.5rem; background: #1a1a24; border-top: 1px solid #2a2a3a; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
@@ -175,6 +175,7 @@ const downloadBtn = document.getElementById('downloadBtn');
 const closeOutputBtn = document.getElementById('closeOutputBtn');
 const ackQR = document.getElementById('ackQR');
 const ackContainer = document.getElementById('ackContainer');
+const ackLabel = document.querySelector('.ack-label');
 
 let stream = null;
 let scanning = false;
@@ -185,8 +186,6 @@ let sessionHash = null;
 let totalChunks = null;
 let contiguousIdx = -1;
 let ackQrInstance = null;
-let lastDecoded = '';
-
 function setStatus(text, dot = false) {
   recvStatusText.textContent = text;
   if (dot) recvDot.classList.add('active');
@@ -213,7 +212,7 @@ function updateACK() {
   if (!ackQrInstance) {
     ackQR.innerHTML = '';
     ackQrInstance = new QRCode(ackQR, {
-      width: 120, height: 120,
+      width: 180, height: 180,
       colorDark: '#000000', colorLight: '#ffffff',
       correctLevel: QRCode.CorrectLevel.M
     });
@@ -224,6 +223,7 @@ function updateACK() {
   ackQrInstance.clear();
   ackQrInstance.makeCode(payload);
   ackContainer.style.display = 'block';
+  ackLabel.textContent = 'CHUNK ' + (contiguousIdx + 1);
 }
 
 function updateProgress() {
@@ -263,8 +263,9 @@ function processData(raw) {
   }
 
   if (received[msg.i] !== undefined) {
-    // Already have it — still ACK it (sender might have missed our ACK)
     flashOverlay();
+    if (contiguousIdx >= 0) updateACK();
+    updateProgress();
     return;
   }
 
@@ -325,11 +326,11 @@ function reassemble() {
 
 async function verifyData(bytes) {
   try {
-    const hashBuf = await crypto.subtle.digest('MD5', bytes);
+    const hashBuf = await crypto.subtle.digest('SHA-256', bytes);
     const hashArr = Array.from(new Uint8Array(hashBuf));
     const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
     const match = hashHex === sessionHash;
-    verifyHash.textContent = 'MD5: ' + hashHex + (match ? ' Verified' : ' MISMATCH');
+    verifyHash.textContent = (match ? 'Verified' : 'MISMATCH');
     verifyHash.className = 'verify-hash ' + (match ? 'match' : 'mismatch');
   } catch {
     verifyHash.textContent = 'Verification unavailable';
@@ -386,8 +387,7 @@ function scanLoop() {
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: 'dontInvert'
         });
-        if (code && code.data && code.data !== lastDecoded) {
-          lastDecoded = code.data;
+        if (code && code.data) {
           processData(code.data);
         }
       } catch {}

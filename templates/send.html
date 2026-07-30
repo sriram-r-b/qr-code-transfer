@@ -26,7 +26,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 .camera-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 0.5rem; }
 .video-wrapper { position: relative; width: 100%; max-width: 280px; border-radius: 0.5rem; overflow: hidden; background: #000; }
 #pipVideo { width: 100%; display: block; transform: scaleX(-1); }
-#pipCanvas { display: none; }
+#pipCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
 .pip-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid rgba(99,102,241,0.3); border-radius: 0.5rem; pointer-events: none; }
 .pip-overlay.has-ack { border-color: rgba(34,197,94,0.6); }
 
@@ -147,6 +147,8 @@ let cameraStream = null;
 let scanning = false;
 let animId = null;
 let selectedFile = null;
+let lastAckTime = 0;
+let resendTimer = null;
 
 // ---- Input handling ----
 fileLabel.addEventListener('click', () => fileInput.click());
@@ -238,11 +240,13 @@ function processACK(data) {
 
   if (msg.i > lastAcked) {
     lastAcked = msg.i;
+    lastAckTime = Date.now();
     pipOverlay.classList.add('has-ack');
     setTimeout(() => pipOverlay.classList.remove('has-ack'), 200);
 
     ackDot.classList.add('active');
     statusText.textContent = 'ACK ' + (lastAcked + 1) + '/' + totalChunks;
+    clearResendTimer();
 
     if (lastAcked >= totalChunks - 1) {
       statusText.textContent = 'Complete!';
@@ -253,8 +257,25 @@ function processACK(data) {
     const next = lastAcked + 1;
     if (next !== displayedIndex) {
       showChunk(next);
+      startResendTimer();
     }
   }
+}
+
+function startResendTimer() {
+  clearResendTimer();
+  resendTimer = setInterval(() => {
+    if (lastAcked >= totalChunks - 1) { clearResendTimer(); return; }
+    const idle = Date.now() - lastAckTime;
+    if (idle > 6000) {
+      statusText.textContent = 'Resending chunk ' + (displayedIndex + 1) + '...';
+      showChunk(displayedIndex);
+    }
+  }, 3000);
+}
+
+function clearResendTimer() {
+  if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
 }
 
 // ---- Camera (ACK listener) ----
@@ -262,7 +283,7 @@ toggleCamBtn.addEventListener('click', async () => {
   if (cameraStream) { stopCamera(); return; }
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 320 }, height: { ideal: 240 } }
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
     });
     pipVideo.srcObject = cameraStream;
     await pipVideo.play();
@@ -322,7 +343,9 @@ generateBtn.addEventListener('click', async () => {
     hashDisplay.textContent = 'Hash: ' + hash.slice(0, 16) + '... | Size: ' + totalSize + 'B';
 
     initQR();
+    lastAckTime = Date.now();
     showChunk(0);
+    startResendTimer();
 
     statusText.textContent = 'Ready — waiting for receiver ACK';
     if (!cameraStream) toggleCamBtn.click();
