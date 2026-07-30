@@ -170,6 +170,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 <script src="/static/jsqr.js"></script>
 <script>
 const CHUNK_SIZE = 80;
+const USE_ACK = false; // Set to true to re-enable ACK mechanism
 
 const recvVideo = document.getElementById('recvVideo');
 const recvCanvas = document.getElementById('recvCanvas');
@@ -280,6 +281,7 @@ function computeContiguous() {
 
 let lastDrawnAck = -1;
 function updateACK() {
+  if (!USE_ACK) return;
   if (contiguousIdx === lastDrawnAck) {
     ackContainer.style.display = 'flex';
     return;
@@ -299,7 +301,7 @@ function updateACK() {
   });
   ackQrInstance.clear();
   ackQrInstance.makeCode(payload);
-  // ackContainer.style.display = 'flex'; // Disabled as per user request to use sleep delay
+  ackContainer.style.display = 'flex';
   ackLabel.textContent = 'ACK CHUNK ' + (contiguousIdx + 1);
   debugLog('info', 'ACK QR displayed', {
     chunkAcked: contiguousIdx + 1,
