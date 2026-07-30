@@ -53,10 +53,11 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   height: min(86vw, calc(100vh - 180px), 900px);
 }
 .ack-label {
-  position: absolute; bottom: 12px; left: 12px; right: 12px;
+  position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
   text-align: center; background: rgba(99,102,241,0.92);
-  color: #fff; font-size: 0.65rem; padding: 2px 0; border-radius: 3px;
+  color: #fff; font-size: 0.65rem; padding: 4px 8px; border-radius: 3px;
   font-weight: 700; letter-spacing: 0.03em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .bottom-bar { padding: 0.6rem 1.5rem; background: #1a1a24; border-top: 1px solid #2a2a3a; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex-shrink: 0; }
@@ -291,7 +292,12 @@ function updateACK() {
   ackQrInstance.clear();
   ackQrInstance.makeCode(payload);
   ackContainer.style.display = 'flex';
-  ackLabel.textContent = 'CHUNK ' + (contiguousIdx + 1);
+  ackLabel.textContent = 'ACK CHUNK ' + (contiguousIdx + 1);
+  debugLog('info', 'ACK QR displayed', {
+    chunkAcked: contiguousIdx + 1,
+    sessionHash: sessionHash?.slice(0, 16),
+    payloadLength: payload.length
+  });
 }
 
 function updateProgress() {

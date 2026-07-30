@@ -117,7 +117,6 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
           <div id="qrcode"></div>
         </div>
         <div class="chunk-info">
-          <div class="chunk-idx" id="chunkIdx">-</div>
           <div class="chunk-total" id="chunkTotal">-</div>
         </div>
         <div class="hash-row" id="hashDisplay"></div>
@@ -138,7 +137,6 @@ const fileInput = document.getElementById('fileInput');
 const fileLabel = document.getElementById('fileLabel');
 const fileBadge = document.getElementById('fileBadge');
 const qrcodeEl = document.getElementById('qrcode');
-const chunkIdx = document.getElementById('chunkIdx');
 const chunkTotal = document.getElementById('chunkTotal');
 const hashDisplay = document.getElementById('hashDisplay');
 const chunkDots = document.getElementById('chunkDots');
@@ -293,7 +291,6 @@ function showChunk(index) {
   });
 
   displayedIndex = index;
-  chunkIdx.textContent = 'Chunk ' + (index + 1);
   chunkTotal.textContent = 'of ' + totalChunks;
   updateDots(index);
   statusText.textContent = 'Showing chunk ' + (index + 1);
@@ -318,9 +315,11 @@ function processACK(data) {
     debugLog('warn', 'decoded ACK QR is not JSON', { error: e.message, preview: data.slice(0, 160) });
     return;
   }
+  debugLog('info', 'parsed ACK message', msg);
   if (msg.v !== 1 || msg.t !== 'a' || msg.h !== sessionHash) {
     debugLog('warn', 'decoded QR is not matching ACK', {
-      v: msg.v, t: msg.t, hashMatches: msg.h === sessionHash
+      v: msg.v, t: msg.t, hashMatches: msg.h === sessionHash,
+      expectedHash: sessionHash.slice(0, 16), receivedHash: msg.h?.slice(0, 16)
     });
     return;
   }
@@ -339,6 +338,14 @@ function processACK(data) {
     statusText.textContent = 'ACK ' + (lastAcked + 1) + '/' + totalChunks;
     clearResendTimer();
 
+    debugLog('info', 'ACK accepted', {
+      ackIndex: msg.i,
+      newLastAcked: lastAcked,
+      totalChunks,
+      displayedIndex,
+      nextChunk: lastAcked + 1
+    });
+
     if (lastAcked >= totalChunks - 1) {
       statusText.textContent = 'Complete!';
       ackDot.classList.remove('active');
@@ -350,6 +357,8 @@ function processACK(data) {
       showChunk(next);
       startResendTimer();
     }
+  } else {
+    debugLog('info', 'duplicate or old ACK ignored', { received: msg.i, lastAcked });
   }
 }
 
