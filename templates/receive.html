@@ -47,7 +47,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   z-index: 10;
 }
-.ack-qr-container canvas, .ack-qr-container img { display: block; width: 180px; height: 180px; }
+.ack-qr-container canvas, .ack-qr-container img { display: block; width: 220px; height: 220px; }
 .ack-label {
   position: absolute; bottom: 4px; left: 4px; right: 4px;
   text-align: center; background: rgba(99,102,241,0.92);
@@ -163,7 +163,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 
 <script src="/static/jsqr.js"></script>
 <script>
-const CHUNK_SIZE = 220;
+const CHUNK_SIZE = 80;
 
 const recvVideo = document.getElementById('recvVideo');
 const recvCanvas = document.getElementById('recvCanvas');
@@ -202,6 +202,8 @@ let decodeHits = 0;
 let lastFrameLog = 0;
 let lastNoCodeLog = 0;
 let lastScanStats = 0;
+let barcodeDetector = null;
+let barcodeDetecting = false;
 
 function debugLog(level, message, details = null) {
   const line = '[' + new Date().toLocaleTimeString() + '] ' + level.toUpperCase() + ' ' + message +
@@ -233,9 +235,19 @@ window.addEventListener('unhandledrejection', event => {
 debugLog('info', 'receiver page loaded', {
   jsQR: typeof jsQR,
   QRCode: typeof QRCode,
+  BarcodeDetector: typeof BarcodeDetector,
   userAgent: navigator.userAgent,
   secureContext: window.isSecureContext
 });
+
+if ('BarcodeDetector' in window) {
+  try {
+    barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+    debugLog('info', 'native BarcodeDetector enabled');
+  } catch (e) {
+    debugLog('warn', 'native BarcodeDetector unavailable', { message: e.message });
+  }
+}
 
 function setStatus(text, dot = false) {
   recvStatusText.textContent = text;
@@ -264,7 +276,7 @@ function updateACK() {
   if (!ackQrInstance) {
     ackQR.innerHTML = '';
     ackQrInstance = new QRCode(ackQR, {
-      width: 180, height: 180,
+      width: 220, height: 220,
       colorDark: '#000000', colorLight: '#ffffff',
       correctLevel: QRCode.CorrectLevel.M
     });
@@ -490,12 +502,45 @@ function scanLoop() {
             location: code.location || null
           });
           processData(code.data);
+        } else if (barcodeDetector && !barcodeDetecting) {
+          barcodeDetecting = true;
+          barcodeDetector.detect(recvCanvas).then(codes => {
+            if (codes.length && codes[0].rawValue) {
+              decodeHits++;
+              debugLog('info', 'native BarcodeDetector decoded candidate', {
+                length: codes[0].rawValue.length,
+                format: codes[0].format,
+                boundingBox: codes[0].boundingBox ? {
+                  x: Math.round(codes[0].boundingBox.x),
+                  y: Math.round(codes[0].boundingBox.y),
+                  width: Math.round(codes[0].boundingBox.width),
+                  height: Math.round(codes[0].boundingBox.height)
+                } : null
+              });
+              processData(codes[0].rawValue);
+            } else if (Date.now() - lastNoCodeLog > 2000) {
+              lastNoCodeLog = Date.now();
+              debugLog('info', 'no QR found in recent frames', {
+                attempts: scanAttempts,
+                errors: scanErrors,
+                hits: decodeHits,
+                jsQR: 'miss',
+                nativeBarcodeDetector: 'miss'
+              });
+            }
+          }).catch(e => {
+            scanErrors++;
+            debugLog('error', 'native BarcodeDetector exception', { name: e.name, message: e.message });
+          }).finally(() => {
+            barcodeDetecting = false;
+          });
         } else if (Date.now() - lastNoCodeLog > 2000) {
           lastNoCodeLog = Date.now();
           debugLog('info', 'no QR found in recent frames', {
             attempts: scanAttempts,
             errors: scanErrors,
-            hits: decodeHits
+            hits: decodeHits,
+            nativeDetectorBusy: true
           });
         }
       } catch (e) {

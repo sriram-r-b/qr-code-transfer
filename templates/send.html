@@ -19,7 +19,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .main { flex: 1; display: flex; overflow: hidden; }
-.panel-left { width: 30%; min-width: 260px; display: flex; flex-direction: column; border-right: 1px solid #2a2a3a; }
+.panel-left { width: 22%; min-width: 220px; display: flex; flex-direction: column; border-right: 1px solid #2a2a3a; }
 .panel-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
 
 .camera-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; background: #0a0a0f; position: relative; }
@@ -48,7 +48,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 
 .qr-container { display: flex; flex-direction: column; align-items: center; }
 .qr-wrapper { background: #fff; padding: 0.75rem; border-radius: 0.75rem; }
-#qrcode img, #qrcode canvas { display: block; width: min(62vmin, 420px); height: min(62vmin, 420px); }
+#qrcode img, #qrcode canvas { display: block; width: min(78vmin, 640px); height: min(78vmin, 640px); }
 .chunk-info { margin-top: 0.75rem; text-align: center; }
 .chunk-idx { font-size: 1.1rem; font-weight: 700; }
 .chunk-total { font-size: 0.8rem; color: #888; }
@@ -117,7 +117,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 
 <script src="/static/jsqr.js"></script>
 <script>
-const CHUNK_SIZE = 220;
+const CHUNK_SIZE = 80;
 
 const dataInput = document.getElementById('dataInput');
 const generateBtn = document.getElementById('generateBtn');
@@ -154,6 +154,9 @@ let ackScanAttempts = 0;
 let ackDecodeHits = 0;
 let ackScanErrors = 0;
 let lastAckScanLog = 0;
+let lastNoAckLog = 0;
+let barcodeDetector = null;
+let barcodeDetecting = false;
 
 function debugLog(level, message, details = null) {
   console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log']('[send]', message, details || '');
@@ -182,9 +185,19 @@ window.addEventListener('unhandledrejection', event => {
 debugLog('info', 'sender page loaded', {
   jsQR: typeof jsQR,
   QRCode: typeof QRCode,
+  BarcodeDetector: typeof BarcodeDetector,
   userAgent: navigator.userAgent,
   secureContext: window.isSecureContext
 });
+
+if ('BarcodeDetector' in window) {
+  try {
+    barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+    debugLog('info', 'native BarcodeDetector enabled for ACK scanner');
+  } catch (e) {
+    debugLog('warn', 'native BarcodeDetector unavailable for ACK scanner', { message: e.message });
+  }
+}
 
 // ---- Input handling ----
 fileLabel.addEventListener('click', () => fileInput.click());
@@ -239,7 +252,7 @@ async function prepareData(text, file) {
 function initQR() {
   qrcodeEl.innerHTML = '';
   qr = new QRCode(qrcodeEl, {
-    width: 420, height: 420,
+    width: 640, height: 640,
     colorDark: '#000000',
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M
@@ -399,6 +412,46 @@ function scanLoop() {
             location: code.location || null
           });
           processACK(code.data);
+        } else if (barcodeDetector && !barcodeDetecting) {
+          barcodeDetecting = true;
+          barcodeDetector.detect(pipCanvas).then(codes => {
+            if (codes.length && codes[0].rawValue) {
+              ackDecodeHits++;
+              debugLog('info', 'native BarcodeDetector decoded ACK candidate', {
+                length: codes[0].rawValue.length,
+                format: codes[0].format,
+                boundingBox: codes[0].boundingBox ? {
+                  x: Math.round(codes[0].boundingBox.x),
+                  y: Math.round(codes[0].boundingBox.y),
+                  width: Math.round(codes[0].boundingBox.width),
+                  height: Math.round(codes[0].boundingBox.height)
+                } : null
+              });
+              processACK(codes[0].rawValue);
+            } else if (Date.now() - lastNoAckLog > 5000) {
+              lastNoAckLog = Date.now();
+              debugLog('info', 'no ACK QR found in recent frames', {
+                attempts: ackScanAttempts,
+                errors: ackScanErrors,
+                hits: ackDecodeHits,
+                jsQR: 'miss',
+                nativeBarcodeDetector: 'miss'
+              });
+            }
+          }).catch(e => {
+            ackScanErrors++;
+            debugLog('error', 'native ACK BarcodeDetector exception', { name: e.name, message: e.message });
+          }).finally(() => {
+            barcodeDetecting = false;
+          });
+        } else if (Date.now() - lastNoAckLog > 5000) {
+          lastNoAckLog = Date.now();
+          debugLog('info', 'no ACK QR found in recent frames', {
+            attempts: ackScanAttempts,
+            errors: ackScanErrors,
+            hits: ackDecodeHits,
+            nativeDetectorBusy: Boolean(barcodeDetector && barcodeDetecting)
+          });
         }
       } catch (e) {
         ackScanErrors++;
