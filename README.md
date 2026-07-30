@@ -15,19 +15,27 @@ No HTTP, no Wi-Fi, no networking at all after the initial page load.
 
 ## Quick Start
 
+### macOS / Linux (conda)
+
 ```bash
-# Create conda environment
 conda create -n qr-transfer python=3.11 -y
 conda activate qr-transfer
-
-# Install
 pip install -r requirements.txt
+python app.py
+```
 
-# Run
+### Windows (venv)
+
+```powershell
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 python app.py
 ```
 
 Open [http://localhost:5001](http://localhost:5001) on both devices (same machine to test).
+
+> **Note**: Both devices must open the same URL. On a single machine, use `localhost:5001`. On different machines on the same LAN, use the server's local IP address (e.g., `http://192.168.x.x:5001`). After the page loads, no network is needed — all logic runs in the browser.
 
 ## Usage
 
