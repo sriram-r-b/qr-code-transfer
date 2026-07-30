@@ -153,8 +153,9 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   </div>
 </div>
 
+<script src="/static/jsqr.js"></script>
 <script>
-const CHUNK_SIZE = 500;
+const CHUNK_SIZE = 220;
 
 const recvVideo = document.getElementById('recvVideo');
 const recvCanvas = document.getElementById('recvCanvas');
@@ -350,7 +351,12 @@ startBtn.addEventListener('click', startCamera);
 async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        advanced: [{ focusMode: 'continuous' }]
+      }
     });
     recvVideo.srcObject = stream;
     await recvVideo.play();
@@ -385,17 +391,18 @@ function scanLoop() {
       try {
         const imageData = ctx.getImageData(0, 0, recvCanvas.width, recvCanvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
+          inversionAttempts: 'attemptBoth'
         });
         if (code && code.data) {
           processData(code.data);
         }
-      } catch {}
+      } catch (e) {
+        log('Scan error: ' + e.message);
+      }
     }
   }
   animId = requestAnimationFrame(scanLoop);
 }
 </script>
-<script src="/static/jsqr.js"></script>
 </body>
 </html>

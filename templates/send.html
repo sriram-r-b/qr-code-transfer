@@ -48,7 +48,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
 
 .qr-container { display: flex; flex-direction: column; align-items: center; }
 .qr-wrapper { background: #fff; padding: 0.75rem; border-radius: 0.75rem; }
-#qrcode img, #qrcode canvas { display: block; width: 280px; height: 280px; }
+#qrcode img, #qrcode canvas { display: block; width: min(62vmin, 420px); height: min(62vmin, 420px); }
 .chunk-info { margin-top: 0.75rem; text-align: center; }
 .chunk-idx { font-size: 1.1rem; font-weight: 700; }
 .chunk-total { font-size: 0.8rem; color: #888; }
@@ -115,8 +115,9 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   </div>
 </div>
 
+<script src="/static/jsqr.js"></script>
 <script>
-const CHUNK_SIZE = 500;
+const CHUNK_SIZE = 220;
 
 const dataInput = document.getElementById('dataInput');
 const generateBtn = document.getElementById('generateBtn');
@@ -197,7 +198,7 @@ async function prepareData(text, file) {
 function initQR() {
   qrcodeEl.innerHTML = '';
   qr = new QRCode(qrcodeEl, {
-    width: 280, height: 280,
+    width: 420, height: 420,
     colorDark: '#000000',
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M
@@ -283,7 +284,12 @@ toggleCamBtn.addEventListener('click', async () => {
   if (cameraStream) { stopCamera(); return; }
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        advanced: [{ focusMode: 'continuous' }]
+      }
     });
     pipVideo.srcObject = cameraStream;
     await pipVideo.play();
@@ -316,9 +322,11 @@ function scanLoop() {
     if (frameSkip === 0) {
       try {
         const imageData = ctx.getImageData(0, 0, pipCanvas.width, pipCanvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
         if (code && code.data) processACK(code.data);
-      } catch {}
+      } catch (e) {
+        statusText.textContent = 'Scan error: ' + e.message;
+      }
     }
   }
   animId = requestAnimationFrame(scanLoop);
@@ -357,6 +365,5 @@ generateBtn.addEventListener('click', async () => {
   generateBtn.textContent = 'Generate';
 });
 </script>
-<script src="/static/jsqr.js"></script>
 </body>
 </html>
