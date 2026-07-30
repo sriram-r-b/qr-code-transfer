@@ -1,15 +1,17 @@
 # QR Data Transfer
 
-Transfer data between devices using QR codes with bidirectional ACK-based reliability.
+Transfer data between devices using only QR codes — no network, no cables, no setup.
+
+Both devices need a camera and a screen. The sender shows data QR codes while the receiver scans them. The receiver shows ACK QR codes that the sender scans to advance. Each chunk is acknowledged before the next one is sent.
 
 ## How It Works
 
-Data is split into chunks, each encoded as a QR code. The sender displays QR codes while the receiver scans them with a camera. Unlike naive QR transfer tools that blindly cycle through codes, this app uses an **ACK-based protocol**:
+1. **Sender** chunks data into 500-byte segments and displays each as a QR code
+2. **Receiver** scans the QR codes with its camera, stores each chunk, and shows an ACK QR for the last contiguous chunk
+3. **Sender's camera** watches the receiver's ACK QR. When the ACK advances, the sender moves to the next chunk
+4. If a chunk is missed, the receiver's ACK stalls at the last good chunk. The sender sees the gap and resends
 
-1. **Sender** displays a chunk as a QR code and **waits** for the receiver to acknowledge it
-2. **Receiver** scans the QR code, decodes the chunk, and sends an **ACK** via HTTP
-3. **Sender** only advances to the next chunk when the ACK is received
-4. If chunks are missed, the **receiver detects gaps** and requests **retransmission**
+No HTTP, no Wi-Fi, no networking at all after the initial page load.
 
 ## Quick Start
 
@@ -25,27 +27,31 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://localhost:5001` — both devices need access to this URL (same network).
+Open [http://localhost:5001](http://localhost:5001) on both devices (same machine to test).
 
 ## Usage
 
-1. On one device: click **Send Data**, enter text or pick a file, then **Generate QR Codes**
-2. On the other device: click **Receive Data**, then **Start Camera**
-3. Point the receiver's camera at the sender's screen
-4. The sender waits for ACKs and auto-advances; the receiver requests retries for missed chunks
+**Send Data** — enter text or pick a file, click Generate. Show the QR code to the receiver.
+
+**Receive Data** — click Start Camera, point at the sender's screen. The ACK QR in the corner tells the sender what to send next.
 
 ## Protocol
 
-Each QR encodes a JSON message:
+Each QR contains a compact JSON message:
 
-```json
-{"v":1,"s":"sess_<id>","i":0,"t":10,"h":"<md5>","d":"<base64 chunk>"}
+```
+Data:  {"v":1,"t":"d","i":5,"n":10,"h":"<sha256>","d":"<base64>"}
+ACK:   {"v":1,"t":"a","h":"<sha256>","i":5}
 ```
 
-- `v`: protocol version
-- `s`: session ID (links sender and receiver)
-- `i` / `t`: chunk index / total chunks
-- `h`: MD5 hash of the full data
-- `d`: base64-encoded chunk data
+The SHA-256 of the full data acts as the session identifier. The receiver's ACK always reports the **highest contiguous chunk** (0 through N all present). The sender uses this value to know exactly where to resume.
 
-The receiver sends ACKs via `POST /api/session/<sid>/ack` and requests retries via `POST /api/session/<sid>/retry` when gaps are detected.
+## Files
+
+| File | Purpose |
+|------|---------|
+| `app.py` | Flask server (serves pages, no logic) |
+| `templates/send.html` | Sender: data QR + camera PIP for ACKs |
+| `templates/receive.html` | Receiver: camera + corner ACK QR |
+| `static/qrcode.min.js` | QR code generation |
+| `static/jsqr.js` | QR code scanning |

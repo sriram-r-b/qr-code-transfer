@@ -4,465 +4,336 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Send Data - QR Data Transfer</title>
+<script src="/static/qrcode.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0f0f13; color: #e0e0e0; min-height: 100vh;
-}
-.container { max-width: 860px; margin: 0 auto; padding: 1.5rem; }
-.top-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
-.back {
-  background: #1a1a24; border: 1px solid #2a2a3a; color: #e0e0e0;
-  padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
-  text-decoration: none; font-size: 0.9rem; transition: background 0.2s;
-}
-.back:hover { background: #2a2a34; }
-h1 { font-size: 1.5rem; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.card { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1.5rem; }
-.card-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
-textarea {
-  width: 100%; min-height: 130px; background: #12121c; border: 1px solid #2a2a3a;
-  border-radius: 0.5rem; padding: 0.75rem; color: #e0e0e0; font-size: 0.95rem;
-  resize: vertical; font-family: inherit; outline: none;
-}
-textarea:focus { border-color: #6366f1; }
-.file-drop {
-  border: 2px dashed #2a2a3a; border-radius: 0.5rem; padding: 1.8rem;
-  text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 1rem;
-}
-.file-drop:hover, .file-drop.dragover { border-color: #6366f1; background: rgba(99,102,241,0.05); }
-.file-drop input { display: none; }
-.file-drop .icon { font-size: 2rem; margin-bottom: 0.5rem; }
-.file-drop .info { color: #888; font-size: 0.9rem; }
-.btn-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
-.btn {
-  padding: 0.6rem 1.4rem; border-radius: 0.5rem; border: none; cursor: pointer;
-  font-size: 0.95rem; font-weight: 600; transition: all 0.2s;
-}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f13; color: #e0e0e0; height: 100vh; overflow: hidden; }
+.container { height: 100vh; display: flex; flex-direction: column; }
+.top-bar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; background: #1a1a24; border-bottom: 1px solid #2a2a3a; }
+.back { background: #2a2a3a; border: none; color: #e0e0e0; padding: 0.4rem 0.8rem; border-radius: 0.4rem; cursor: pointer; text-decoration: none; font-size: 0.85rem; }
+.back:hover { background: #3a3a4a; }
+h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.status { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: none; }
+.status-dot.active { display: block; animation: blink 1.2s infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.main { flex: 1; display: flex; overflow: hidden; }
+.panel-left { width: 30%; min-width: 260px; display: flex; flex-direction: column; border-right: 1px solid #2a2a3a; }
+.panel-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+
+.camera-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; background: #0a0a0f; position: relative; }
+.camera-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 0.5rem; }
+.video-wrapper { position: relative; width: 100%; max-width: 280px; border-radius: 0.5rem; overflow: hidden; background: #000; }
+#pipVideo { width: 100%; display: block; transform: scaleX(-1); }
+#pipCanvas { display: none; }
+.pip-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid rgba(99,102,241,0.3); border-radius: 0.5rem; pointer-events: none; }
+.pip-overlay.has-ack { border-color: rgba(34,197,94,0.6); }
+
+.input-panel { padding: 0.75rem; border-top: 1px solid #2a2a3a; background: #15151e; }
+.input-panel textarea { width: 100%; min-height: 60px; background: #12121c; border: 1px solid #2a2a3a; border-radius: 0.35rem; padding: 0.4rem; color: #e0e0e0; font-size: 0.8rem; resize: vertical; font-family: inherit; outline: none; margin-bottom: 0.4rem; }
+.input-panel textarea:focus { border-color: #6366f1; }
+.input-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.btn { padding: 0.35rem 0.8rem; border-radius: 0.35rem; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.15s; }
 .btn-primary { background: #6366f1; color: #fff; }
-.btn-primary:hover { background: #5558e6; transform: translateY(-1px); }
-.btn-primary:disabled { background: #3a3a5a; cursor: not-allowed; transform: none; }
+.btn-primary:hover { background: #5558e6; }
+.btn-primary:disabled { background: #3a3a5a; cursor: not-allowed; }
 .btn-secondary { background: #2a2a3a; color: #e0e0e0; }
 .btn-secondary:hover { background: #3a3a4a; }
-.btn-success { background: #22c55e; color: #fff; }
-.btn-success:hover { background: #16a34a; }
-.btn-warning { background: #f59e0b; color: #000; }
-.btn-warning:hover { background: #d97706; }
+.btn-small { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+.file-label { font-size: 0.7rem; color: #888; padding: 0.25rem 0.5rem; background: #2a2a3a; border-radius: 0.25rem; cursor: pointer; }
+.file-label:hover { background: #3a3a4a; }
+#fileInput { display: none; }
+.file-badge { font-size: 0.7rem; color: #22c55e; }
 
-.qr-section { text-align: center; }
-.qr-wrapper {
-  display: inline-block; background: #fff; padding: 1rem;
-  border-radius: 0.75rem; margin: 0.75rem 0;
-}
-.qr-wrapper img { display: block; margin: 0 auto; width: 260px; height: 260px; }
+.qr-container { display: flex; flex-direction: column; align-items: center; }
+.qr-wrapper { background: #fff; padding: 0.75rem; border-radius: 0.75rem; }
+#qrcode img, #qrcode canvas { display: block; width: 280px; height: 280px; }
+.chunk-info { margin-top: 0.75rem; text-align: center; }
+.chunk-idx { font-size: 1.1rem; font-weight: 700; }
+.chunk-total { font-size: 0.8rem; color: #888; }
+.hash-row { margin-top: 0.35rem; font-family: monospace; font-size: 0.6rem; color: #555; word-break: break-all; max-width: 400px; }
 
-.status-bar {
-  display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-  margin: 0.75rem 0; flex-wrap: wrap;
-}
-.status-chip {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.9rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
-}
-.status-chip.waiting { background: rgba(99,102,241,0.15); color: #818cf8; }
-.status-chip.ackd { background: rgba(34,197,94,0.15); color: #22c55e; }
-.status-chip.retry { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.status-chip.done { background: rgba(34,197,94,0.2); color: #22c55e; }
+.chunk-dots { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; margin-top: 0.75rem; padding: 0 1rem; max-width: 400px; }
+.cdot { width: 14px; height: 14px; border-radius: 3px; background: #2a2a3a; transition: background 0.2s; }
+.cdot.acked { background: #22c55e; }
+.cdot.current { background: #6366f1; }
 
-.chunks-grid {
-  display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin: 0.75rem 0;
-}
-.chunk-dot {
-  width: 28px; height: 28px; border-radius: 6px; background: #2a2a3a;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem; color: #555; transition: all 0.25s; font-weight: 600;
-  border: 2px solid transparent;
-}
-.chunk-dot.pending { background: #2a2a3a; color: #555; }
-.chunk-dot.current { background: #6366f1; color: #fff; border-color: #818cf8; transform: scale(1.1); }
-.chunk-dot.acked { background: #22c55e; color: #fff; }
-.chunk-dot.retry { background: #f59e0b; color: #000; animation: pulse 1s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-
-.controls { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 0.5rem; }
-.controls button {
-  padding: 0.5rem 1rem; border-radius: 0.5rem; border: 1px solid #2a2a3a;
-  background: #1a1a24; color: #e0e0e0; cursor: pointer; font-size: 0.85rem;
-  transition: all 0.2s;
-}
-.controls button:hover { background: #2a2a3a; border-color: #6366f1; }
-.controls button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.log-section { max-height: 100px; overflow-y: auto; font-family: monospace; font-size: 0.78rem; margin-top: 0.75rem; }
-.log-entry { padding: 2px 0; color: #888; }
-.log-entry.info { color: #818cf8; }
-.log-entry.success { color: #22c55e; }
-.log-entry.error { color: #ef4444; }
-.log-entry.warn { color: #f59e0b; }
-
-.hash-display { font-family: monospace; font-size: 0.75rem; color: #666; word-break: break-all; margin-top: 0.5rem; }
-.file-info { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #12121c; border-radius: 0.5rem; margin-top: 0.5rem; }
-.file-info .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-info .size { color: #888; font-size: 0.85rem; }
-.file-info .remove { cursor: pointer; color: #ef4444; font-size: 1.2rem; line-height: 1; }
 .hidden { display: none !important; }
-.session-badge {
-  background: #12121c; border: 1px solid #2a2a3a; border-radius: 0.5rem;
-  padding: 0.4rem 0.8rem; font-family: monospace; font-size: 0.8rem; color: #888;
-  cursor: pointer; user-select: all;
-}
-.server-url { text-align: center; font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
+
+/* input mode card */
+.input-mode { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+.input-mode textarea { width: 100%; max-width: 500px; min-height: 120px; margin-bottom: 1rem; }
+.input-mode .btn-row { display: flex; gap: 0.75rem; }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="container" id="sendMode">
   <div class="top-bar">
     <a href="/" class="back">&larr; Back</a>
     <h1>Send Data</h1>
-    <span class="session-badge hidden" id="sessionBadge"></span>
-  </div>
-
-  <div class="card" id="inputCard">
-    <div class="card-title">Input</div>
-    <textarea id="dataInput" placeholder="Type or paste text data here..."></textarea>
-    <div class="file-drop" id="fileDrop">
-      <div class="icon">&#128206;</div>
-      <div class="info">Drop a file here, or click to browse</div>
-      <input type="file" id="fileInput">
-    </div>
-    <div id="fileInfo" class="file-info hidden">
-      <span>&#128196;</span>
-      <span class="name" id="fileName"></span>
-      <span class="size" id="fileSize"></span>
-      <span class="remove" id="removeFile">&times;</span>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="generateBtn">Generate QR Codes</button>
-      <button class="btn btn-secondary" id="clearBtn">Clear</button>
+    <div class="status">
+      <span id="statusText">Ready</span>
+      <span class="status-dot" id="ackDot"></span>
     </div>
   </div>
-
-  <div class="card hidden" id="transferCard">
-    <div class="card-title">
-      <span>Transfer</span>
-      <span id="transferStatus" class="status-chip waiting">WAITING</span>
-    </div>
-    <div class="server-url" id="serverUrl"></div>
-    <div class="qr-section">
-      <div class="qr-wrapper" id="qrWrapper">
-        <img id="qrImage" src="" alt="QR Code">
+  <div class="main">
+    <div class="panel-left">
+      <div class="camera-box">
+        <div class="label">ACK Scanner</div>
+        <div class="video-wrapper">
+          <video id="pipVideo" autoplay playsinline muted></video>
+          <canvas id="pipCanvas"></canvas>
+          <div class="pip-overlay" id="pipOverlay"></div>
+        </div>
+        <button class="btn btn-secondary btn-small" id="toggleCamBtn" style="margin-top:0.4rem;">&#9654; Start Camera</button>
+      </div>
+      <div class="input-panel">
+        <textarea id="dataInput" placeholder="Type or paste text..."></textarea>
+        <div class="input-row">
+          <button class="btn btn-primary btn-small" id="generateBtn">Generate</button>
+          <label class="file-label" id="fileLabel">&#128206; File</label>
+          <input type="file" id="fileInput">
+          <span class="file-badge hidden" id="fileBadge"></span>
+          <button class="btn btn-secondary btn-small" id="clearBtn">Clear</button>
+        </div>
       </div>
     </div>
-    <div class="chunks-grid" id="chunksGrid"></div>
-    <div class="controls">
-      <button id="skipBtn" title="Skip to next unacked chunk (if receiver missed it)">Skip &rarr;</button>
-      <button id="resetTransferBtn" class="btn-warning">Reset Transfer</button>
+    <div class="panel-right">
+      <div class="qr-container">
+        <div class="qr-wrapper" id="qrWrapper">
+          <div id="qrcode"></div>
+        </div>
+        <div class="chunk-info">
+          <div class="chunk-idx" id="chunkIdx">-</div>
+          <div class="chunk-total" id="chunkTotal">-</div>
+        </div>
+        <div class="hash-row" id="hashDisplay"></div>
+        <div class="chunk-dots" id="chunkDots"></div>
+      </div>
     </div>
-    <div class="log-section" id="logSection"></div>
-    <div class="hash-display" id="hashDisplay"></div>
   </div>
 </div>
 
 <script>
+const CHUNK_SIZE = 500;
+
 const dataInput = document.getElementById('dataInput');
-const fileDrop = document.getElementById('fileDrop');
-const fileInput = document.getElementById('fileInput');
-const fileInfo = document.getElementById('fileInfo');
-const fileName = document.getElementById('fileName');
-const fileSize = document.getElementById('fileSize');
-const removeFile = document.getElementById('removeFile');
 const generateBtn = document.getElementById('generateBtn');
 const clearBtn = document.getElementById('clearBtn');
-const inputCard = document.getElementById('inputCard');
-const transferCard = document.getElementById('transferCard');
-const qrImage = document.getElementById('qrImage');
-const chunksGrid = document.getElementById('chunksGrid');
-const transferStatus = document.getElementById('transferStatus');
-const serverUrl = document.getElementById('serverUrl');
-const sessionBadge = document.getElementById('sessionBadge');
+const fileInput = document.getElementById('fileInput');
+const fileLabel = document.getElementById('fileLabel');
+const fileBadge = document.getElementById('fileBadge');
+const qrcodeEl = document.getElementById('qrcode');
+const chunkIdx = document.getElementById('chunkIdx');
+const chunkTotal = document.getElementById('chunkTotal');
 const hashDisplay = document.getElementById('hashDisplay');
-const logSection = document.getElementById('logSection');
-const skipBtn = document.getElementById('skipBtn');
-const resetTransferBtn = document.getElementById('resetTransferBtn');
+const chunkDots = document.getElementById('chunkDots');
+const statusText = document.getElementById('statusText');
+const ackDot = document.getElementById('ackDot');
 
-let sessionId = null;
+const pipVideo = document.getElementById('pipVideo');
+const pipCanvas = document.getElementById('pipCanvas');
+const pipOverlay = document.getElementById('pipOverlay');
+const toggleCamBtn = document.getElementById('toggleCamBtn');
+
+let qr = null;
 let chunks = [];
-let currentIndex = 0;
-let pollInterval = null;
+let sessionHash = '';
+let displayedIndex = 0;
+let lastAcked = -1;
+let totalChunks = 0;
+let cameraStream = null;
+let scanning = false;
+let animId = null;
 let selectedFile = null;
 
-// --- Helpers ---
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-function addLog(msg, type = 'info') {
-  const entry = document.createElement('div');
-  entry.className = 'log-entry ' + type;
-  const time = new Date().toLocaleTimeString();
-  entry.textContent = '[' + time + '] ' + msg;
-  logSection.appendChild(entry);
-  logSection.scrollTop = logSection.scrollHeight;
-}
-
-function setStatus(text, cls = 'waiting') {
-  transferStatus.textContent = text;
-  transferStatus.className = 'status-chip ' + cls;
-}
-
-// --- File handling ---
-fileDrop.addEventListener('click', () => fileInput.click());
-fileDrop.addEventListener('dragover', (e) => { e.preventDefault(); fileDrop.classList.add('dragover'); });
-fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
-fileDrop.addEventListener('drop', (e) => {
-  e.preventDefault(); fileDrop.classList.remove('dragover');
-  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-});
-fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
-
-function handleFile(file) {
-  selectedFile = file;
-  fileName.textContent = file.name;
-  fileSize.textContent = formatSize(file.size);
-  fileInfo.classList.remove('hidden');
-  dataInput.value = '';
-}
-
-removeFile.addEventListener('click', () => {
-  selectedFile = null;
-  fileInfo.classList.add('hidden');
-  fileInput.value = '';
+// ---- Input handling ----
+fileLabel.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    selectedFile = fileInput.files[0];
+    fileBadge.textContent = selectedFile.name;
+    fileBadge.classList.remove('hidden');
+    dataInput.value = '';
+  }
 });
 
 clearBtn.addEventListener('click', () => {
   dataInput.value = '';
   selectedFile = null;
-  fileInfo.classList.add('hidden');
+  fileBadge.classList.add('hidden');
   fileInput.value = '';
-  stopTransfer();
 });
 
-// --- Session creation ---
+// ---- SHA-256 ----
+async function sha256(data) {
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ---- Chunking ----
+async function prepareData(text, file) {
+  let bytes;
+  if (file) {
+    const buf = await file.arrayBuffer();
+    bytes = new Uint8Array(buf);
+  } else {
+    bytes = new TextEncoder().encode(text);
+  }
+  const hash = await sha256(bytes);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const slice = bytes.slice(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    const b64 = btoa(String.fromCharCode(...slice));
+    chunks.push({ i: chunks.length, d: b64 });
+  }
+  return { chunks, hash, totalSize: bytes.length };
+}
+
+// ---- QR generation ----
+function initQR() {
+  qrcodeEl.innerHTML = '';
+  qr = new QRCode(qrcodeEl, {
+    width: 280, height: 280,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+function showChunk(index) {
+  if (!chunks.length || !qr) return;
+  const c = chunks[index];
+  const payload = JSON.stringify({
+    v: 1, t: 'd', i: c.i, n: totalChunks, h: sessionHash, d: c.d
+  });
+  qr.clear();
+  qr.makeCode(payload);
+
+  displayedIndex = index;
+  chunkIdx.textContent = 'Chunk ' + (index + 1);
+  chunkTotal.textContent = 'of ' + totalChunks;
+  updateDots(index);
+  statusText.textContent = 'Showing chunk ' + (index + 1);
+}
+
+function updateDots(active) {
+  chunkDots.innerHTML = '';
+  for (let i = 0; i < totalChunks; i++) {
+    const d = document.createElement('div');
+    d.className = 'cdot';
+    if (i < lastAcked + 1) d.classList.add('acked');
+    if (i === active) d.classList.add('current');
+    chunkDots.appendChild(d);
+  }
+}
+
+// ---- ACK processing ----
+function processACK(data) {
+  let msg;
+  try { msg = JSON.parse(data); } catch { return; }
+  if (msg.v !== 1 || msg.t !== 'a' || msg.h !== sessionHash) return;
+  if (msg.i === undefined) return;
+
+  if (msg.i > lastAcked) {
+    lastAcked = msg.i;
+    pipOverlay.classList.add('has-ack');
+    setTimeout(() => pipOverlay.classList.remove('has-ack'), 200);
+
+    ackDot.classList.add('active');
+    statusText.textContent = 'ACK ' + (lastAcked + 1) + '/' + totalChunks;
+
+    if (lastAcked >= totalChunks - 1) {
+      statusText.textContent = 'Complete!';
+      ackDot.classList.remove('active');
+      return;
+    }
+
+    const next = lastAcked + 1;
+    if (next !== displayedIndex) {
+      showChunk(next);
+    }
+  }
+}
+
+// ---- Camera (ACK listener) ----
+toggleCamBtn.addEventListener('click', async () => {
+  if (cameraStream) { stopCamera(); return; }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 320 }, height: { ideal: 240 } }
+    });
+    pipVideo.srcObject = cameraStream;
+    await pipVideo.play();
+    scanning = true;
+    toggleCamBtn.textContent = 'Stop Camera';
+    statusText.textContent = 'Camera active';
+    scanLoop();
+  } catch (e) {
+    statusText.textContent = 'Camera error: ' + e.message;
+  }
+});
+
+function stopCamera() {
+  scanning = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  pipVideo.srcObject = null;
+  toggleCamBtn.textContent = 'Start Camera';
+}
+
+let frameSkip = 0;
+function scanLoop() {
+  if (!scanning) return;
+  const ctx = pipCanvas.getContext('2d', { willReadFrequently: true });
+  if (pipVideo.readyState >= pipVideo.HAVE_ENOUGH_DATA) {
+    pipCanvas.width = pipVideo.videoWidth || 160;
+    pipCanvas.height = pipVideo.videoHeight || 120;
+    ctx.drawImage(pipVideo, 0, 0);
+    frameSkip = (frameSkip + 1) % 3;
+    if (frameSkip === 0) {
+      try {
+        const imageData = ctx.getImageData(0, 0, pipCanvas.width, pipCanvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) processACK(code.data);
+      } catch {}
+    }
+  }
+  animId = requestAnimationFrame(scanLoop);
+}
+
+// ---- Generate ----
 generateBtn.addEventListener('click', async () => {
   const text = dataInput.value.trim();
-  if (!text && !selectedFile) { addLog('Enter text or select a file first.', 'warn'); return; }
+  if (!text && !selectedFile) { statusText.textContent = 'Enter text or select a file'; return; }
 
   generateBtn.disabled = true;
-  generateBtn.textContent = 'Generating...';
-  addLog('Chunking data...', 'info');
+  generateBtn.textContent = 'Preparing...';
 
   try {
-    let payload;
-    if (selectedFile) {
-      const buf = await selectedFile.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const b64 = btoa(String.fromCharCode(...bytes));
-      payload = { data: b64, is_file: true, filename: selectedFile.name };
-    } else {
-      payload = { data: text, is_file: false, filename: '' };
-    }
+    const { chunks: c, hash, totalSize } = await prepareData(text, selectedFile);
+    if (!c.length) throw new Error('No data');
 
-    const resp = await fetch('/api/session/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = await resp.json();
+    chunks = c;
+    sessionHash = hash;
+    totalChunks = c.length;
+    lastAcked = -1;
+    hashDisplay.textContent = 'Hash: ' + hash.slice(0, 16) + '... | Size: ' + totalSize + 'B';
 
-    if (!result.sid) throw new Error(result.error || 'Failed to create session');
+    initQR();
+    showChunk(0);
 
-    sessionId = result.sid;
-    chunks = result.chunks;
-
-    inputCard.classList.add('hidden');
-    transferCard.classList.remove('hidden');
-    sessionBadge.textContent = sessionId;
-    sessionBadge.classList.remove('hidden');
-
-    const loc = window.location;
-    serverUrl.textContent = 'Receiver: open ' + loc.origin + '/receive on the other device';
-    hashDisplay.textContent = 'MD5: ' + result.data_hash + ' | ' + chunks.length + ' chunks';
-
-    currentIndex = 0;
-    renderGrid();
-    await displayQR(currentIndex);
-    setStatus('Waiting for receiver...', 'waiting');
-    addLog('Session created: ' + sessionId, 'success');
-    addLog('Total: ' + chunks.length + ' chunks (' + formatSize(result.total_size) + ')', 'info');
-
-    startPolling();
-  } catch (err) {
-    addLog('Error: ' + err.message, 'error');
-    setStatus('ERROR', 'waiting');
-  } finally {
-    generateBtn.disabled = false;
-    generateBtn.textContent = 'Generate QR Codes';
+    statusText.textContent = 'Ready — waiting for receiver ACK';
+    if (!cameraStream) toggleCamBtn.click();
+  } catch (e) {
+    statusText.textContent = 'Error: ' + e.message;
   }
+
+  generateBtn.disabled = false;
+  generateBtn.textContent = 'Generate';
 });
-
-// --- QR display ---
-async function displayQR(index) {
-  if (!chunks.length) return;
-  qrImage.style.opacity = '0.4';
-  try {
-    const resp = await fetch('/api/qr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chunk: chunks[index], sid: sessionId, box_size: 6, border: 2 }),
-    });
-    const result = await resp.json();
-    qrImage.src = 'data:image/png;base64,' + result.qr;
-    qrImage.style.opacity = '1';
-    updateGrid(index);
-  } catch (err) {
-    addLog('QR gen error for chunk ' + index + ': ' + err.message, 'error');
-  }
-}
-
-// --- Grid ---
-function renderGrid() {
-  chunksGrid.innerHTML = '';
-  for (let i = 0; i < chunks.length; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'chunk-dot pending';
-    dot.id = 'cd-' + i;
-    dot.textContent = i + 1;
-    chunksGrid.appendChild(dot);
-  }
-}
-
-function updateGrid(activeIdx) {
-  for (let i = 0; i < chunks.length; i++) {
-    const dot = document.getElementById('cd-' + i);
-    dot.classList.remove('current', 'acked', 'retry', 'pending');
-    dot.classList.add('pending');
-  }
-  const active = document.getElementById('cd-' + activeIdx);
-  if (active) active.classList.replace('pending', 'current');
-}
-
-function markAcked(index) {
-  const dot = document.getElementById('cd-' + index);
-  if (dot) {
-    dot.classList.remove('current', 'retry', 'pending');
-    dot.classList.add('acked');
-  }
-}
-
-function markRetry(index) {
-  const dot = document.getElementById('cd-' + index);
-  if (dot) {
-    dot.classList.remove('current', 'acked', 'pending');
-    dot.classList.add('retry');
-  }
-}
-
-// --- Polling ---
-function startPolling() {
-  pollInterval = setInterval(pollStatus, 500);
-}
-
-function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-}
-
-async function pollStatus() {
-  if (!sessionId || !chunks.length) return;
-  try {
-    const resp = await fetch('/api/session/' + sessionId + '/status');
-    if (!resp.ok) {
-      const err = await resp.json();
-      if (err.expired) {
-        addLog('Session expired — generate again', 'error');
-        stopPolling();
-        return;
-      }
-      return;
-    }
-    const status = await resp.json();
-
-    if (status.complete) {
-      setStatus('Complete! All ' + chunks.length + ' chunks received', 'done');
-      stopPolling();
-      addLog('All chunks acknowledged by receiver!', 'success');
-      return;
-    }
-
-    // Update acked dots
-    status.acked.forEach(idx => markAcked(idx));
-
-    // Check for retry requests
-    if (status.retry_requested.length > 0) {
-      const target = status.retry_requested[0];
-      status.retry_requested.forEach(idx => markRetry(idx));
-      if (target !== currentIndex) {
-        currentIndex = target;
-        await displayQR(currentIndex);
-        setStatus('Retry: chunk ' + (target + 1), 'retry');
-        addLog('Receiver missed chunk ' + (target + 1) + ' — resending', 'warn');
-      }
-      return;
-    }
-
-    // Normal advancement: if current chunk is acked, move to next unacked
-    if (status.acked.includes(currentIndex)) {
-      markAcked(currentIndex);
-      // Find next unacked chunk
-      const unacked = [];
-      for (let i = 0; i < chunks.length; i++) {
-        if (!status.acked.includes(i)) unacked.push(i);
-      }
-      if (unacked.length > 0) {
-        currentIndex = unacked[0];
-        await displayQR(currentIndex);
-        const pct = Math.round(status.acked.length / chunks.length * 100);
-        setStatus('Sent ' + status.acked.length + '/' + chunks.length + ' (' + pct + '%)', 'ackd');
-        addLog('Chunk ' + (currentIndex) + ' sent (advancing)', 'success');
-      }
-    } else {
-      // Still waiting for ACK on current chunk
-      const waitTime = Math.round(status.acked.length / chunks.length * 100);
-      setStatus('Waiting for chunk ' + (currentIndex + 1) + ' (' + waitTime + '%)', 'waiting');
-    }
-  } catch (err) {
-    // silent
-  }
-}
-
-// --- Controls ---
-skipBtn.addEventListener('click', async () => {
-  if (!sessionId) return;
-  try {
-    const resp = await fetch('/api/session/' + sessionId + '/status');
-    const status = await resp.json();
-    const unacked = [];
-    for (let i = 0; i < chunks.length; i++) {
-      if (!status.acked.includes(i)) unacked.push(i);
-    }
-    if (unacked.length > 0 && unacked[0] !== currentIndex) {
-      currentIndex = unacked[0];
-      await displayQR(currentIndex);
-      addLog('Manually skipped to chunk ' + (currentIndex + 1), 'info');
-    }
-  } catch {}
-});
-
-resetTransferBtn.addEventListener('click', () => {
-  stopTransfer();
-  inputCard.classList.remove('hidden');
-  transferCard.classList.add('hidden');
-});
-
-function stopTransfer() {
-  stopPolling();
-  sessionId = null;
-  chunks = [];
-  currentIndex = 0;
-  logSection.innerHTML = '';
-}
 </script>
+<script src="/static/jsqr.js"></script>
 </body>
 </html>
