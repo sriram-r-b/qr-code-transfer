@@ -51,6 +51,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   display: block;
   width: min(86vw, calc(100vh - 180px), 900px);
   height: min(86vw, calc(100vh - 180px), 900px);
+  image-rendering: pixelated;
 }
 .ack-label {
   position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
@@ -290,7 +291,7 @@ function updateACK() {
     ackQrInstance = new QRCode(ackQR, {
       width: 900, height: 900,
       colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
+      correctLevel: QRCode.CorrectLevel.L
     });
   }
   const payload = JSON.stringify({
@@ -437,6 +438,11 @@ copyBtn.addEventListener('click', () => {
 
 closeOutputBtn.addEventListener('click', () => {
   outputCard.classList.remove('open');
+});
+
+ackContainer.addEventListener('click', () => {
+  ackContainer.style.display = 'none';
+  lastDrawnAck = -1; // Force redraw next time a chunk arrives if needed
 });
 
 startBtn.addEventListener('click', startCamera);

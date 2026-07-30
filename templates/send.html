@@ -59,6 +59,7 @@ h1 { font-size: 1.2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -
   display: block;
   width: min(86vw, calc(100vh - 190px), 900px);
   height: min(86vw, calc(100vh - 190px), 900px);
+  image-rendering: pixelated;
 }
 .chunk-info { margin-top: 0.75rem; text-align: center; }
 .chunk-idx { font-size: 1.1rem; font-weight: 700; }
@@ -273,7 +274,7 @@ function initQR() {
     width: 900, height: 900,
     colorDark: '#000000',
     colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M
+    correctLevel: QRCode.CorrectLevel.L
   });
 }
 
@@ -525,6 +526,7 @@ generateBtn.addEventListener('click', async () => {
     sessionHash = hash;
     totalChunks = c.length;
     lastAcked = -1;
+    window.lastDecodedAck = null;
     hashDisplay.textContent = 'Hash: ' + hash.slice(0, 16) + '... | Size: ' + totalSize + 'B';
 
     initQR();
